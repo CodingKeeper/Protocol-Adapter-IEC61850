@@ -13,8 +13,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>protocol-adapter-iec61850</artifactId>
-  <groupId>com.alliander.osgp</groupId>
-  <version>4.29.0</version>
+  <groupId>org.opensmartgridplatform</groupId>
+  <version>4.30.0</version>
   <packaging>pom</packaging>
   <name>protocol-adapter-iec61850</name>
   <properties>
