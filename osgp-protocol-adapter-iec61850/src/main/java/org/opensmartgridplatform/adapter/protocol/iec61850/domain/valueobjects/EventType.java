@@ -13,6 +13,8 @@ import java.util.Set;
 
 import org.opensmartgridplatform.dto.valueobjects.EventNotificationTypeDto;
 import org.opensmartgridplatform.dto.valueobjects.EventTypeDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public enum EventType {
 
@@ -41,7 +43,9 @@ public enum EventType {
     NTP_SYNC_ALARM_OFFSET(23, "NTP_SYNC_ALARM_OFFSET", EventNotificationTypeDto.COMM_EVENTS, EventTypeDto.NTP_SYNC_ALARM_OFFSET),
     NTP_SYNC_MAX_OFFSET(24, "NTP_SYNC_MAX_OFFSET", EventNotificationTypeDto.COMM_EVENTS, EventTypeDto.NTP_SYNC_MAX_OFFSET),
     AUTHENTICATION_FAIL(25, "AUTHENTICATION_FAIL", EventNotificationTypeDto.SECURITY_EVENTS, EventTypeDto.AUTHENTICATION_FAIL);
-    
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(EventType.class);
+
     private final int code;
     private final String description;
     private final EventNotificationTypeDto notificationType;
@@ -99,6 +103,7 @@ public enum EventType {
         if (filter == null) {
             return null;
         }
+
         final int mask = Integer.parseInt(filter, 16);
         final Set<EventType> eventTypes = EnumSet.noneOf(EventType.class);
         for (final EventType eventType : EventType.values()) {
@@ -115,22 +120,41 @@ public enum EventType {
         if (eventTypesForFilter == null) {
             return null;
         }
+
         final Set<EventNotificationTypeDto> notificationTypes = EnumSet.noneOf(EventNotificationTypeDto.class);
         for (final EventType eventType : eventTypesForFilter) {
             notificationTypes.add(eventType.getNotificationType());
         }
 
-        /*
-         * Verify that either all or none of the event types per notification
-         * type were set, by checking the filter for the observed notification
-         * types against the filter used to determine these notification types.
-         */
-        final String verifyFilter = getEventTypeFilterMaskForNotificationTypes(notificationTypes);
-        if (!filter.equals(verifyFilter)) {
-            throw new IllegalArgumentException("The event filter received (" + filter
-                    + ") belongs with notification types for which some, but not all of the events are filtered.");
-        }
+        verifyFilter(filter, notificationTypes);
+
         return notificationTypes;
+    }
+
+    /*
+     * Verify that either all or none of the event types per notification type
+     * were set, by checking the filter for the observed notification types
+     * against the filter used to determine these notification types.
+     *
+     * Mismatches between OSGP and device firmware (when the firmware supports
+     * less or more events than OSGP) are a possible cause for a failing
+     * verification.
+     */
+    private static void verifyFilter(final String filter, final Set<EventNotificationTypeDto> notificationTypes) {
+        final String verifyFilter = getEventTypeFilterMaskForNotificationTypes(notificationTypes);
+
+        final boolean verified = filter.equals(verifyFilter);
+        if (!verified) {
+            final int filterMask = Integer.parseInt(filter, 16);
+            final int verifyFilterMask = Integer.parseInt(verifyFilter, 16);
+
+            final String additionalDescription = filterMask < verifyFilterMask
+                    ? "The event filter maps to notification types for which some, but not all of the events are filtered."
+                    : "The event filter has unknown events.";
+
+            LOGGER.warn("Filter ({}) does not match VerifyFilter ({}). {}", filter, verifyFilter,
+                    additionalDescription);
+        }
     }
 
     @Override
